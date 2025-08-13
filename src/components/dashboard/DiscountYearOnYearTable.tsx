@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ModernDataTable } from '@/components/ui/ModernDataTable';
 import { SalesData } from '@/types/dashboard';
 import { formatCurrency, formatNumber } from '@/utils/formatters';
-import { Calendar, TrendingUp, TrendingDown } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface DiscountYearOnYearTableProps {
@@ -16,25 +16,8 @@ export const DiscountYearOnYearTable: React.FC<DiscountYearOnYearTableProps> = (
   const processedData = useMemo(() => {
     const discountedData = data.filter(item => (item.discountAmount || 0) > 0);
     
-    // Apply filters
-    let filteredData = discountedData;
-    if (filters) {
-      filteredData = discountedData.filter(item => {
-        if (filters.location && item.calculatedLocation !== filters.location) return false;
-        if (filters.category && item.cleanedCategory !== filters.category) return false;
-        if (filters.product && item.cleanedProduct !== filters.product) return false;
-        if (filters.soldBy && (item.soldBy === '-' ? 'Online/System' : item.soldBy) !== filters.soldBy) return false;
-        if (filters.paymentMethod && item.paymentMethod !== filters.paymentMethod) return false;
-        if (filters.minDiscountAmount && (item.discountAmount || 0) < filters.minDiscountAmount) return false;
-        if (filters.maxDiscountAmount && (item.discountAmount || 0) > filters.maxDiscountAmount) return false;
-        if (filters.minDiscountPercent && (item.discountPercentage || 0) < filters.minDiscountPercent) return false;
-        if (filters.maxDiscountPercent && (item.discountPercentage || 0) > filters.maxDiscountPercent) return false;
-        return true;
-      });
-    }
-
     // Group by year and month
-    const yearMonthData = filteredData.reduce((acc, item) => {
+    const yearMonthData = discountedData.reduce((acc, item) => {
       const date = new Date(item.paymentDate);
       const year = date.getFullYear();
       const month = date.getMonth() + 1;
@@ -75,9 +58,9 @@ export const DiscountYearOnYearTable: React.FC<DiscountYearOnYearTableProps> = (
       if (!monthData) {
         return {
           month,
-          year2024: { transactions: 0, totalDiscount: 0, totalRevenue: 0, discountRate: 0, avgDiscount: 0, customers: 0 },
-          year2025: { transactions: 0, totalDiscount: 0, totalRevenue: 0, discountRate: 0, avgDiscount: 0, customers: 0 },
-          yoyChange: { transactions: 0, discount: 0, revenue: 0 }
+          year2024: { transactions: 0, totalDiscount: 0, totalRevenue: 0, discountRate: 0, avgDiscount: 0, atv: 0, auv: 0, customers: 0 },
+          year2025: { transactions: 0, totalDiscount: 0, totalRevenue: 0, discountRate: 0, avgDiscount: 0, atv: 0, auv: 0, customers: 0 },
+          yoyChange: { transactions: 0, discount: 0, revenue: 0, atv: 0 }
         };
       }
 
@@ -90,6 +73,8 @@ export const DiscountYearOnYearTable: React.FC<DiscountYearOnYearTableProps> = (
         totalRevenue: data2024.totalRevenue,
         discountRate: data2024.totalPotentialRevenue > 0 ? (data2024.totalDiscount / data2024.totalPotentialRevenue) * 100 : 0,
         avgDiscount: data2024.transactions > 0 ? data2024.totalDiscount / data2024.transactions : 0,
+        atv: data2024.transactions > 0 ? data2024.totalRevenue / data2024.transactions : 0,
+        auv: data2024.transactions > 0 ? data2024.totalRevenue / data2024.transactions : 0,
         customers: data2024.uniqueCustomers.size
       };
 
@@ -99,18 +84,21 @@ export const DiscountYearOnYearTable: React.FC<DiscountYearOnYearTableProps> = (
         totalRevenue: data2025.totalRevenue,
         discountRate: data2025.totalPotentialRevenue > 0 ? (data2025.totalDiscount / data2025.totalPotentialRevenue) * 100 : 0,
         avgDiscount: data2025.transactions > 0 ? data2025.totalDiscount / data2025.transactions : 0,
+        atv: data2025.transactions > 0 ? data2025.totalRevenue / data2025.transactions : 0,
+        auv: data2025.transactions > 0 ? data2025.totalRevenue / data2025.transactions : 0,
         customers: data2025.uniqueCustomers.size
       };
 
       const yoyChange = {
         transactions: year2024.transactions > 0 ? ((year2025.transactions - year2024.transactions) / year2024.transactions) * 100 : 0,
         discount: year2024.totalDiscount > 0 ? ((year2025.totalDiscount - year2024.totalDiscount) / year2024.totalDiscount) * 100 : 0,
-        revenue: year2024.totalRevenue > 0 ? ((year2025.totalRevenue - year2024.totalRevenue) / year2024.totalRevenue) * 100 : 0
+        revenue: year2024.totalRevenue > 0 ? ((year2025.totalRevenue - year2024.totalRevenue) / year2024.totalRevenue) * 100 : 0,
+        atv: year2024.atv > 0 ? ((year2025.atv - year2024.atv) / year2024.atv) * 100 : 0
       };
 
       return { month, year2024, year2025, yoyChange };
     });
-  }, [data, filters]);
+  }, [data]);
 
   const totals = useMemo(() => {
     return processedData.reduce((acc, row) => ({
@@ -132,36 +120,31 @@ export const DiscountYearOnYearTable: React.FC<DiscountYearOnYearTableProps> = (
     });
   }, [processedData]);
 
-  const columns: Array<{
-    key: 'month' | 'year2024' | 'year2025' | 'yoyChange';
-    header: string;
-    align?: 'left' | 'center' | 'right';
-    render?: (value: any, item: any) => React.ReactNode;
-  }> = [
+  const columns = [
     { 
       key: 'month', 
       header: 'Month', 
-      align: 'left',
-      render: (value: string) => <span className="font-semibold">{value}</span>
+      align: 'left' as const,
+      render: (value: string) => <span className="font-semibold text-slate-800">{value}</span>
     },
     { 
       key: 'year2024', 
       header: '2024 Transactions', 
-      align: 'center',
-      render: (value: any) => formatNumber(value.transactions)
+      align: 'center' as const,
+      render: (value: any) => <span className="font-medium">{formatNumber(value.transactions)}</span>
     },
     { 
       key: 'year2025', 
       header: '2025 Transactions', 
-      align: 'center',
-      render: (value: any) => formatNumber(value.transactions)
+      align: 'center' as const,
+      render: (value: any) => <span className="font-medium">{formatNumber(value.transactions)}</span>
     },
     { 
       key: 'yoyChange', 
       header: 'Transaction Change', 
-      align: 'center',
+      align: 'center' as const,
       render: (value: any) => (
-        <Badge variant={value.transactions >= 0 ? "default" : "destructive"}>
+        <Badge variant={value.transactions >= 0 ? "default" : "destructive"} className="min-w-[70px] justify-center">
           {value.transactions > 0 ? '+' : ''}{value.transactions.toFixed(1)}%
         </Badge>
       )
@@ -169,44 +152,44 @@ export const DiscountYearOnYearTable: React.FC<DiscountYearOnYearTableProps> = (
     { 
       key: 'year2024', 
       header: '2024 Discount', 
-      align: 'right',
+      align: 'center' as const,
       render: (value: any) => <span className="text-red-600 font-medium">{formatCurrency(value.totalDiscount)}</span>
     },
     { 
       key: 'year2025', 
       header: '2025 Discount', 
-      align: 'right',
+      align: 'center' as const,
       render: (value: any) => <span className="text-red-600 font-medium">{formatCurrency(value.totalDiscount)}</span>
     },
     { 
       key: 'yoyChange', 
       header: 'Discount Change', 
-      align: 'center',
+      align: 'center' as const,
       render: (value: any) => (
-        <Badge variant={value.discount <= 0 ? "default" : "destructive"}>
+        <Badge variant={value.discount <= 0 ? "default" : "destructive"} className="min-w-[70px] justify-center">
           {value.discount > 0 ? '+' : ''}{value.discount.toFixed(1)}%
         </Badge>
       )
     },
     { 
       key: 'year2024', 
-      header: '2024 Revenue', 
-      align: 'right',
-      render: (value: any) => formatCurrency(value.totalRevenue)
+      header: '2024 ATV', 
+      align: 'center' as const,
+      render: (value: any) => <span className="text-blue-600 font-medium">{formatCurrency(value.atv)}</span>
     },
     { 
       key: 'year2025', 
-      header: '2025 Revenue', 
-      align: 'right',
-      render: (value: any) => formatCurrency(value.totalRevenue)
+      header: '2025 ATV', 
+      align: 'center' as const,
+      render: (value: any) => <span className="text-blue-600 font-medium">{formatCurrency(value.atv)}</span>
     },
     { 
       key: 'yoyChange', 
-      header: 'Revenue Change', 
-      align: 'center',
+      header: 'ATV Change', 
+      align: 'center' as const,
       render: (value: any) => (
-        <Badge variant={value.revenue >= 0 ? "default" : "destructive"}>
-          {value.revenue > 0 ? '+' : ''}{value.revenue.toFixed(1)}%
+        <Badge variant={value.atv >= 0 ? "default" : "destructive"} className="min-w-[70px] justify-center">
+          {value.atv > 0 ? '+' : ''}{value.atv.toFixed(1)}%
         </Badge>
       )
     }
@@ -232,7 +215,9 @@ export const DiscountYearOnYearTable: React.FC<DiscountYearOnYearTableProps> = (
             yoyChange: {
               transactions: totals.year2024.transactions > 0 ? ((totals.year2025.transactions - totals.year2024.transactions) / totals.year2024.transactions) * 100 : 0,
               discount: totals.year2024.totalDiscount > 0 ? ((totals.year2025.totalDiscount - totals.year2024.totalDiscount) / totals.year2024.totalDiscount) * 100 : 0,
-              revenue: totals.year2024.totalRevenue > 0 ? ((totals.year2025.totalRevenue - totals.year2024.totalRevenue) / totals.year2024.totalRevenue) * 100 : 0
+              revenue: totals.year2024.totalRevenue > 0 ? ((totals.year2025.totalRevenue - totals.year2024.totalRevenue) / totals.year2024.totalRevenue) * 100 : 0,
+              atv: totals.year2024.totalRevenue > 0 && totals.year2024.transactions > 0 && totals.year2025.totalRevenue > 0 && totals.year2025.transactions > 0 ? 
+                (((totals.year2025.totalRevenue / totals.year2025.transactions) - (totals.year2024.totalRevenue / totals.year2024.transactions)) / (totals.year2024.totalRevenue / totals.year2024.transactions)) * 100 : 0
             }
           }}
           maxHeight="500px"

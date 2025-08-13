@@ -1,9 +1,10 @@
+
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ModernDataTable } from '@/components/ui/ModernDataTable';
 import { SalesData } from '@/types/dashboard';
-import { formatCurrency, formatNumber, formatPercentage } from '@/utils/formatters';
-import { TrendingUp, TrendingDown, Calendar } from 'lucide-react';
+import { formatCurrency, formatNumber } from '@/utils/formatters';
+import { Calendar } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface DiscountMonthOnMonthTableProps {
@@ -15,30 +16,8 @@ export const DiscountMonthOnMonthTable: React.FC<DiscountMonthOnMonthTableProps>
   const processedData = useMemo(() => {
     const discountedData = data.filter(item => (item.discountAmount || 0) > 0);
     
-    // Apply filters
-    let filteredData = discountedData;
-    if (filters) {
-      filteredData = discountedData.filter(item => {
-        if (filters.location && item.calculatedLocation !== filters.location) return false;
-        if (filters.category && item.cleanedCategory !== filters.category) return false;
-        if (filters.product && item.cleanedProduct !== filters.product) return false;
-        if (filters.soldBy && (item.soldBy === '-' ? 'Online/System' : item.soldBy) !== filters.soldBy) return false;
-        if (filters.paymentMethod && item.paymentMethod !== filters.paymentMethod) return false;
-        if (filters.minDiscountAmount && (item.discountAmount || 0) < filters.minDiscountAmount) return false;
-        if (filters.maxDiscountAmount && (item.discountAmount || 0) > filters.maxDiscountAmount) return false;
-        if (filters.minDiscountPercent && (item.discountPercentage || 0) < filters.minDiscountPercent) return false;
-        if (filters.maxDiscountPercent && (item.discountPercentage || 0) > filters.maxDiscountPercent) return false;
-        if (filters.dateRange?.from || filters.dateRange?.to) {
-          const itemDate = new Date(item.paymentDate);
-          if (filters.dateRange.from && itemDate < filters.dateRange.from) return false;
-          if (filters.dateRange.to && itemDate > filters.dateRange.to) return false;
-        }
-        return true;
-      });
-    }
-
     // Group by month
-    const monthlyData = filteredData.reduce((acc, item) => {
+    const monthlyData = discountedData.reduce((acc, item) => {
       const date = new Date(item.paymentDate);
       const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
       const monthName = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
@@ -51,7 +30,6 @@ export const DiscountMonthOnMonthTable: React.FC<DiscountMonthOnMonthTableProps>
           totalRevenue: 0,
           totalPotentialRevenue: 0,
           uniqueCustomers: new Set(),
-          topCategory: {},
           discountPercentages: []
         };
       }
@@ -63,10 +41,6 @@ export const DiscountMonthOnMonthTable: React.FC<DiscountMonthOnMonthTableProps>
       acc[monthKey].uniqueCustomers.add(item.customerEmail);
       acc[monthKey].discountPercentages.push(item.discountPercentage || 0);
 
-      // Track top category
-      const category = item.cleanedCategory || 'Unknown';
-      acc[monthKey].topCategory[category] = (acc[monthKey].topCategory[category] || 0) + (item.discountAmount || 0);
-
       return acc;
     }, {} as Record<string, any>);
 
@@ -76,7 +50,6 @@ export const DiscountMonthOnMonthTable: React.FC<DiscountMonthOnMonthTableProps>
       const current = monthlyData[monthKey];
       const previous = index > 0 ? monthlyData[months[index - 1]] : null;
 
-      // Calculate averages and changes
       const avgDiscountPercent = current.discountPercentages.length > 0 
         ? current.discountPercentages.reduce((sum: number, val: number) => sum + val, 0) / current.discountPercentages.length 
         : 0;
@@ -85,14 +58,19 @@ export const DiscountMonthOnMonthTable: React.FC<DiscountMonthOnMonthTableProps>
         ? (current.totalDiscount / current.totalPotentialRevenue) * 100 
         : 0;
 
+      const avgTransactionValue = current.transactions > 0 
+        ? current.totalRevenue / current.transactions 
+        : 0;
+
+      const avgUnitValue = current.transactions > 0 
+        ? current.totalRevenue / current.transactions 
+        : 0;
+
       const avgDiscountAmount = current.transactions > 0 
         ? current.totalDiscount / current.transactions 
         : 0;
 
-      const topCategory = Object.entries(current.topCategory)
-        .sort(([,a], [,b]) => (b as number) - (a as number))[0];
-
-      // Calculate MoM changes with null checks
+      // Calculate MoM changes
       const discountChange = previous && previous.totalDiscount > 0
         ? ((current.totalDiscount - previous.totalDiscount) / previous.totalDiscount) * 100 
         : 0;
@@ -114,15 +92,16 @@ export const DiscountMonthOnMonthTable: React.FC<DiscountMonthOnMonthTableProps>
         discountRate,
         avgDiscountPercent,
         avgDiscountAmount,
+        avgTransactionValue,
+        avgUnitValue,
         uniqueCustomers: current.uniqueCustomers.size,
-        topCategory: topCategory ? topCategory[0] : 'N/A',
         discountChange,
         transactionChange,
         revenueChange,
         revenueLost: current.totalPotentialRevenue - current.totalRevenue
       };
     }).reverse(); // Most recent first
-  }, [data, filters]);
+  }, [data]);
 
   const totals = useMemo(() => {
     return processedData.reduce((acc, row) => ({
@@ -139,7 +118,7 @@ export const DiscountMonthOnMonthTable: React.FC<DiscountMonthOnMonthTableProps>
       key: 'month', 
       header: 'Month', 
       align: 'left' as const,
-      render: (value: string) => <span className="font-semibold">{value}</span>
+      render: (value: string) => <span className="font-semibold text-slate-800">{value}</span>
     },
     { 
       key: 'transactions', 
@@ -149,8 +128,8 @@ export const DiscountMonthOnMonthTable: React.FC<DiscountMonthOnMonthTableProps>
         <div className="flex flex-col items-center">
           <span className="font-medium">{formatNumber(value)}</span>
           {item.transactionChange !== 0 && (
-            <Badge variant={item.transactionChange > 0 ? "default" : "destructive"} className="text-xs mt-1">
-              {item.transactionChange > 0 ? '+' : ''}{(item.transactionChange || 0).toFixed(1)}%
+            <Badge variant={item.transactionChange > 0 ? "default" : "destructive"} className="text-xs mt-1 min-w-[60px] justify-center">
+              {item.transactionChange > 0 ? '+' : ''}{item.transactionChange.toFixed(1)}%
             </Badge>
           )}
         </div>
@@ -159,13 +138,13 @@ export const DiscountMonthOnMonthTable: React.FC<DiscountMonthOnMonthTableProps>
     { 
       key: 'totalDiscount', 
       header: 'Total Discount', 
-      align: 'right' as const,
+      align: 'center' as const,
       render: (value: number, item: any) => (
-        <div className="flex flex-col items-end">
+        <div className="flex flex-col items-center">
           <span className="font-semibold text-red-600">{formatCurrency(value)}</span>
           {item.discountChange !== 0 && (
-            <Badge variant={item.discountChange > 0 ? "destructive" : "default"} className="text-xs mt-1">
-              {item.discountChange > 0 ? '+' : ''}{(item.discountChange || 0).toFixed(1)}%
+            <Badge variant={item.discountChange > 0 ? "destructive" : "default"} className="text-xs mt-1 min-w-[60px] justify-center">
+              {item.discountChange > 0 ? '+' : ''}{item.discountChange.toFixed(1)}%
             </Badge>
           )}
         </div>
@@ -174,51 +153,51 @@ export const DiscountMonthOnMonthTable: React.FC<DiscountMonthOnMonthTableProps>
     { 
       key: 'avgDiscountAmount', 
       header: 'Avg Discount', 
-      align: 'right' as const,
-      render: (value: number) => formatCurrency(value || 0)
+      align: 'center' as const,
+      render: (value: number) => <span className="font-medium text-slate-700">{formatCurrency(value || 0)}</span>
     },
     { 
       key: 'discountRate', 
       header: 'Discount Rate', 
       align: 'center' as const,
       render: (value: number) => (
-        <Badge variant="outline" className="text-red-600 border-red-200">
+        <Badge variant="outline" className="text-red-600 border-red-200 min-w-[60px] justify-center">
           {(value || 0).toFixed(1)}%
         </Badge>
       )
     },
     { 
+      key: 'avgTransactionValue', 
+      header: 'ATV', 
+      align: 'center' as const,
+      render: (value: number) => <span className="font-medium text-blue-600">{formatCurrency(value || 0)}</span>
+    },
+    { 
+      key: 'avgUnitValue', 
+      header: 'AUV', 
+      align: 'center' as const,
+      render: (value: number) => <span className="font-medium text-green-600">{formatCurrency(value || 0)}</span>
+    },
+    { 
       key: 'totalRevenue', 
       header: 'Revenue', 
-      align: 'right' as const,
+      align: 'center' as const,
       render: (value: number, item: any) => (
-        <div className="flex flex-col items-end">
+        <div className="flex flex-col items-center">
           <span className="font-medium">{formatCurrency(value)}</span>
           {item.revenueChange !== 0 && (
-            <Badge variant={item.revenueChange > 0 ? "default" : "destructive"} className="text-xs mt-1">
-              {item.revenueChange > 0 ? '+' : ''}{(item.revenueChange || 0).toFixed(1)}%
+            <Badge variant={item.revenueChange > 0 ? "default" : "destructive"} className="text-xs mt-1 min-w-[60px] justify-center">
+              {item.revenueChange > 0 ? '+' : ''}{item.revenueChange.toFixed(1)}%
             </Badge>
           )}
         </div>
       )
     },
     { 
-      key: 'revenueLost', 
-      header: 'Revenue Lost', 
-      align: 'right' as const,
-      render: (value: number) => <span className="text-red-600 font-medium">{formatCurrency(value || 0)}</span>
-    },
-    { 
       key: 'uniqueCustomers', 
       header: 'Customers', 
       align: 'center' as const,
-      render: (value: number) => formatNumber(value || 0)
-    },
-    { 
-      key: 'topCategory', 
-      header: 'Top Category', 
-      align: 'center' as const,
-      render: (value: string) => <Badge variant="secondary">{value || 'N/A'}</Badge>
+      render: (value: number) => <span className="font-medium text-slate-700">{formatNumber(value || 0)}</span>
     }
   ];
 
@@ -241,10 +220,10 @@ export const DiscountMonthOnMonthTable: React.FC<DiscountMonthOnMonthTableProps>
             totalDiscount: totals.totalDiscount,
             avgDiscountAmount: totals.transactions > 0 ? totals.totalDiscount / totals.transactions : 0,
             discountRate: totals.totalRevenue > 0 ? (totals.totalDiscount / (totals.totalRevenue + totals.totalDiscount)) * 100 : 0,
+            avgTransactionValue: totals.transactions > 0 ? totals.totalRevenue / totals.transactions : 0,
+            avgUnitValue: totals.transactions > 0 ? totals.totalRevenue / totals.transactions : 0,
             totalRevenue: totals.totalRevenue,
-            revenueLost: totals.revenueLost,
             uniqueCustomers: totals.uniqueCustomers,
-            topCategory: 'Various',
             discountChange: 0,
             transactionChange: 0,
             revenueChange: 0
@@ -265,8 +244,8 @@ export const DiscountMonthOnMonthTable: React.FC<DiscountMonthOnMonthTableProps>
               <div className="font-semibold">{formatNumber(totals.transactions)}</div>
             </div>
             <div>
-              <span className="text-slate-600">Revenue Lost:</span>
-              <div className="font-semibold text-red-600">{formatCurrency(totals.revenueLost)}</div>
+              <span className="text-slate-600">Revenue Generated:</span>
+              <div className="font-semibold text-green-600">{formatCurrency(totals.totalRevenue)}</div>
             </div>
             <div>
               <span className="text-slate-600">Customers Affected:</span>

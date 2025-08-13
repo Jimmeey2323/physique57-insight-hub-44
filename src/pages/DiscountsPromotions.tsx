@@ -14,6 +14,8 @@ import { DiscountMetricCards } from '@/components/dashboard/DiscountMetricCards'
 import { DiscountInteractiveCharts } from '@/components/dashboard/DiscountInteractiveCharts';
 import { DiscountInteractiveTopBottomLists } from '@/components/dashboard/DiscountInteractiveTopBottomLists';
 import { DiscountDataTable } from '@/components/dashboard/DiscountDataTable';
+import { DiscountMonthOnMonthTable } from '@/components/dashboard/DiscountMonthOnMonthTable';
+import { DiscountYearOnYearTable } from '@/components/dashboard/DiscountYearOnYearTable';
 import { DrillDownModal } from '@/components/dashboard/DrillDownModal';
 
 const DiscountsPromotions = () => {
@@ -25,16 +27,12 @@ const DiscountsPromotions = () => {
   const [selectedLocation, setSelectedLocation] = useState<string>('all');
   const [drillDownModal, setDrillDownModal] = useState<{
     isOpen: boolean;
-    title: string;
-    data: any[];
-    type: string;
-    columns: any[];
+    data: any;
+    type: 'metric' | 'product' | 'category' | 'member' | 'soldBy' | 'paymentMethod' | 'client-conversion' | 'trainer' | 'location';
   }>({
     isOpen: false,
-    title: '',
-    data: [],
-    type: '',
-    columns: []
+    data: null,
+    type: 'metric'
   });
 
   useEffect(() => {
@@ -134,21 +132,23 @@ const DiscountsPromotions = () => {
     };
   }, [filteredData]);
 
-  const handleDrillDown = (title: string, data: any[], type: string) => {
-    const columns = [
-      { key: 'customerName', header: 'Customer' },
-      { key: 'paymentItem', header: 'Product' },
-      { key: 'paymentDate', header: 'Date' },
-      { key: 'discountAmount', header: 'Discount', render: (value: number) => formatCurrency(value) },
-      { key: 'paymentValue', header: 'Revenue', render: (value: number) => formatCurrency(value) }
-    ];
+  const handleDrillDown = (title: string, rawData: any[], type: string) => {
+    console.log('DrillDown called with:', { title, dataLength: rawData.length, type });
+    
+    // Map the data to the expected format for drill-down
+    const drillDownData = {
+      name: title,
+      totalValue: rawData.reduce((sum, item) => sum + (item.paymentValue || 0), 0),
+      totalTransactions: rawData.length,
+      totalCustomers: new Set(rawData.map(item => item.customerEmail)).size,
+      rawData: rawData,
+      metricValue: rawData.reduce((sum, item) => sum + (item.discountAmount || 0), 0)
+    };
     
     setDrillDownModal({
       isOpen: true,
-      title,
-      data,
-      type: 'discount', // Fixed: use a valid type from the union
-      columns
+      data: drillDownData,
+      type: 'metric' // Use a valid type from the union
     });
   };
 
@@ -290,6 +290,18 @@ const DiscountsPromotions = () => {
             onDrillDown={handleDrillDown}
           />
 
+          {/* Month-on-Month Table */}
+          <DiscountMonthOnMonthTable
+            data={filteredData}
+            filters={filters}
+          />
+
+          {/* Year-on-Year Table */}
+          <DiscountYearOnYearTable
+            data={filteredData}
+            filters={filters}
+          />
+
           {/* Full Width Data Tables */}
           <DiscountDataTable
             data={filteredData}
@@ -303,10 +315,8 @@ const DiscountsPromotions = () => {
       <DrillDownModal
         isOpen={drillDownModal.isOpen}
         onClose={() => setDrillDownModal({ ...drillDownModal, isOpen: false })}
-        title={drillDownModal.title}
         data={drillDownModal.data}
         type={drillDownModal.type}
-        columns={drillDownModal.columns}
       />
       
       <Footer />
