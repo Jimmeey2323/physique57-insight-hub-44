@@ -99,6 +99,7 @@ const DiscountsPromotions = () => {
       });
     }
     
+    console.log('Filtered discount data:', result.length, 'items');
     return result;
   }, [data, filters, selectedLocation]);
 
@@ -146,7 +147,7 @@ const DiscountsPromotions = () => {
       isOpen: true,
       title,
       data,
-      type,
+      type: 'discount', // Fixed: use a valid type from the union
       columns
     });
   };

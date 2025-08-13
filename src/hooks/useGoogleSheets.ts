@@ -9,11 +9,10 @@ const GOOGLE_CONFIG = {
   TOKEN_URL: "https://oauth2.googleapis.com/token"
 };
 
-
 const SPREADSHEET_ID = "149ILDqovzZA6FRUJKOwzutWdVqmqWBtWPfzG3A0zxTI";
 
 export const useGoogleSheets = () => {
-  const [data, setData] = useState<SalesData[]>([]);
+  const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,29 +66,18 @@ export const useGoogleSheets = () => {
       }
 
       const headers = rows[0];
-      const salesData: SalesData[] = rows.slice(1).map((row: any[]) => ({
-        memberId: row[0] || '',
-        customerName: row[1] || '',
-        customerEmail: row[2] || '',
-        saleItemId: row[3] || '',
-        paymentCategory: row[4] || '',
-        paymentDate: row[5] || '',
-        paymentValue: parseFloat(row[6]) || 0,
-        paidInMoneyCredits: parseFloat(row[7]) || 0,
-        paymentVAT: parseFloat(row[8]) || 0,
-        paymentItem: row[9] || '',
-        paymentMethod: row[10] || '',
-        paymentStatus: row[11] || '',
-        paymentTransactionId: row[12] || '',
-        stripeToken: row[13] || '',
-        soldBy: row[14] || '',
-        saleReference: row[15] || '',
-        calculatedLocation: row[16] || '',
-        cleanedProduct: row[17] || '',
-        cleanedCategory: row[18] || '',
-        membershipType: row[24] || '',
-      }));
+      console.log('Sheet headers:', headers);
+      
+      // Map rows to objects using headers
+      const salesData = rows.slice(1).map((row: any[]) => {
+        const item: any = {};
+        headers.forEach((header: string, index: number) => {
+          item[header] = row[index] || '';
+        });
+        return item;
+      });
 
+      console.log('Processed sales data sample:', salesData.slice(0, 3));
       setData(salesData);
       setError(null);
     } catch (err) {

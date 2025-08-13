@@ -10,6 +10,8 @@ export const useDiscountsData = () => {
   useEffect(() => {
     if (salesData && salesData.length > 0) {
       try {
+        console.log('Processing sales data for discounts...', salesData.length, 'items');
+        
         const processedData: SalesData[] = salesData.map((item: any) => {
           // Parse date correctly - handle DD/MM/YYYY HH:mm:ss format
           const parseDate = (dateStr: string) => {
@@ -23,7 +25,7 @@ export const useDiscountsData = () => {
               const date = new Date(isoDate);
               return date.toISOString().split('T')[0]; // Return YYYY-MM-DD format
             } catch (e) {
-              console.error('Date parsing error:', e);
+              console.error('Date parsing error for:', dateStr, e);
               return '';
             }
           };
@@ -64,6 +66,7 @@ export const useDiscountsData = () => {
         });
 
         console.log('Processed discount data:', processedData.length, 'items');
+        console.log('Sample processed item:', processedData[0]);
         setDiscountData(processedData);
       } catch (error) {
         console.error('Error processing discount data:', error);
