@@ -3,13 +3,12 @@ import { useState, useEffect } from 'react';
 import { SalesData } from '@/types/dashboard';
 
 const GOOGLE_CONFIG = {
-  CLIENT_ID: "416630995185-g7b0fm679lb4p45p5lou070cqscaalaf.apps.googleusercontent.com",
-  CLIENT_SECRET: "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",
-  REFRESH_TOKEN: "1//0gT2uoYBlNdGXCgYIARAAGBASNwF-L9IrBK_ijYwpce6-TdqDfji4GxYuc4uxIBKasdgoZBPm-tu_EU0xS34cNirqfLgXbJ8_NMk",
+  CLIENT_ID: "416630995185-007ermh3iidknbbtdmu5vct207mdlbaa.apps.googleusercontent.com",
+  CLIENT_SECRET: "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",
+  REFRESH_TOKEN: "1//04pAfj5ZB3ahLCgYIARAAGAQSNwF-L9IrqCo4OyUjAbO1hP5bR3vhs8K96zDZkbeCzcuCjzEiBPZ3O639cLRkUduicMYK1Rzs5GY",
   TOKEN_URL: "https://oauth2.googleapis.com/token"
 };
 
-// Correct spreadsheet ID for discounts from Sales sheet
 const SPREADSHEET_ID = "149ILDqovzZA6FRUJKOwzutWdVqmqWBtWPfzG3A0zxTI";
 
 export const useDiscountsData = () => {
@@ -71,7 +70,6 @@ export const useDiscountsData = () => {
       
       console.log(`Fetched ${rows.length} rows from Sales sheet`);
       console.log('Headers:', rows[0]);
-      console.log('Sample rows:', rows.slice(1, 6));
       
       if (rows.length < 2) {
         console.log('No data rows found');
@@ -79,11 +77,10 @@ export const useDiscountsData = () => {
         return;
       }
 
-      // Map according to the provided Sales sheet structure
+      // Map according to the correct column order from the Sales sheet
       const salesData: SalesData[] = rows.slice(1).map((row: any[], index: number) => {
         try {
-          // Parse discount amount and percentage safely
-          const discountAmount = parseNumericValue(row[22]); // Column 23: Discount Amount -Mrp- Payment Value
+          const discountAmount = parseNumericValue(row[22]); // Column 23: Discount Amount
           const discountPercentage = parseNumericValue(row[23]); // Column 24: Discount Percentage
           const mrpPreTax = parseNumericValue(row[20]); // Column 21: Mrp - Pre Tax
           const mrpPostTax = parseNumericValue(row[21]); // Column 22: Mrp - Post Tax
@@ -96,7 +93,6 @@ export const useDiscountsData = () => {
           }
 
           return {
-            // Column mapping based on provided structure (0-based indexing)
             memberId: String(row[0] || ''), // Column 1: Member ID
             customerName: String(row[1] || ''), // Column 2: Customer Name
             customerEmail: String(row[2] || ''), // Column 3: Customer Email
@@ -137,12 +133,8 @@ export const useDiscountsData = () => {
       
       // Filter and log discount data
       const discountedItems = salesData.filter(item => item.discountAmount && item.discountAmount > 0);
-      const negativeDiscountItems = salesData.filter(item => item.discountAmount && item.discountAmount < 0);
+      console.log('Items with discounts:', discountedItems.length);
       
-      console.log('Items with positive discounts:', discountedItems.length);
-      console.log('Items with negative discount amounts (refunds/credits):', negativeDiscountItems.length);
-      
-      // Log sample discount data for debugging
       if (discountedItems.length > 0) {
         console.log('Sample discount data:', discountedItems.slice(0, 3).map(item => ({
           product: item.cleanedProduct,
@@ -151,14 +143,9 @@ export const useDiscountsData = () => {
           discountPercentage: item.discountPercentage,
           paymentValue: item.paymentValue,
           mrpPreTax: item.mrpPreTax,
-          mrpPostTax: item.mrpPostTax,
-          rawDiscountCol: item.discountAmount // This should show the raw parsed value
+          mrpPostTax: item.mrpPostTax
         })));
       }
-      
-      // Log some non-discount items for comparison
-      const nonDiscountItems = salesData.filter(item => !item.discountAmount || item.discountAmount === 0);
-      console.log('Items without discounts:', nonDiscountItems.length);
       
       setData(salesData);
       setError(null);

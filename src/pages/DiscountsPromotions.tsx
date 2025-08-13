@@ -1,6 +1,5 @@
 
-import React, { useEffect, useMemo } from 'react';
-import DiscountsSection from '@/components/dashboard/DiscountsSection';
+import React, { useEffect, useMemo, useState } from 'react';
 import { RefinedLoader } from '@/components/ui/RefinedLoader';
 import { useDiscountsData } from '@/hooks/useDiscountsData';
 import { useGlobalLoading } from '@/hooks/useGlobalLoading';
@@ -8,20 +7,35 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Home, Tag, TrendingDown, Users, Percent, DollarSign } from 'lucide-react';
 import { Footer } from '@/components/ui/footer';
-import { formatCurrency, formatNumber, formatPercentage } from '@/utils/formatters';
+import { formatCurrency, formatNumber } from '@/utils/formatters';
+import { DiscountFilterSection } from '@/components/dashboard/DiscountFilterSection';
+import { DiscountLocationSelector } from '@/components/dashboard/DiscountLocationSelector';
+import { DiscountMetricCards } from '@/components/dashboard/DiscountMetricCards';
+import { DiscountInteractiveCharts } from '@/components/dashboard/DiscountInteractiveCharts';
+import { DiscountInteractiveTopBottomLists } from '@/components/dashboard/DiscountInteractiveTopBottomLists';
+import { DiscountDataTable } from '@/components/dashboard/DiscountDataTable';
 
 const DiscountsPromotions = () => {
   const { data, loading } = useDiscountsData();
   const { isLoading: globalLoading, setLoading } = useGlobalLoading();
   const navigate = useNavigate();
+  const [isFiltersCollapsed, setIsFiltersCollapsed] = useState(false);
+  const [filters, setFilters] = useState<any>({});
+  const [selectedLocation, setSelectedLocation] = useState<string>('all');
 
   useEffect(() => {
     setLoading(loading, 'Loading discount and promotional data...');
   }, [loading, setLoading]);
 
+  // Apply location filter
+  const locationFilteredData = useMemo(() => {
+    if (!data || selectedLocation === 'all') return data;
+    return data.filter(item => item.calculatedLocation === selectedLocation);
+  }, [data, selectedLocation]);
+
   // Calculate key metrics for hero section
   const heroMetrics = useMemo(() => {
-    if (!data || data.length === 0) {
+    if (!locationFilteredData || locationFilteredData.length === 0) {
       return {
         totalDiscountValue: 0,
         discountedTransactions: 0,
@@ -32,12 +46,12 @@ const DiscountsPromotions = () => {
       };
     }
 
-    const discountedData = data.filter(item => (item.discountAmount || 0) > 0);
+    const discountedData = locationFilteredData.filter(item => (item.discountAmount || 0) > 0);
     
     const totalDiscountValue = discountedData.reduce((sum, item) => sum + (item.discountAmount || 0), 0);
     const discountedTransactions = discountedData.length;
     const uniqueMembers = new Set(discountedData.map(item => item.customerEmail)).size;
-    const unitsSold = discountedData.length; // Each transaction represents units sold
+    const unitsSold = discountedData.length;
     const totalDiscountPercentages = discountedData.reduce((sum, item) => sum + (item.discountPercentage || 0), 0);
     const avgDiscountPercentage = discountedTransactions > 0 ? totalDiscountPercentages / discountedTransactions : 0;
     const totalRevenueLost = discountedData.reduce((sum, item) => sum + ((item.mrpPostTax || item.mrpPreTax || item.paymentValue || 0) - (item.paymentValue || 0)), 0);
@@ -50,7 +64,7 @@ const DiscountsPromotions = () => {
       unitsSold,
       totalRevenueLost
     };
-  }, [data]);
+  }, [locationFilteredData]);
 
   if (globalLoading) {
     return <RefinedLoader subtitle="Loading discount and promotional data..." />;
@@ -58,7 +72,7 @@ const DiscountsPromotions = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-orange-50/30 to-amber-50/20">
-      {/* Enhanced Hero Section with Animated Metrics */}
+      {/* Enhanced Hero Section */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-orange-800 via-red-800 to-pink-800">
           <div className="absolute inset-0 bg-black/30"></div>
@@ -155,7 +169,44 @@ const DiscountsPromotions = () => {
 
       <div className="container mx-auto px-6 py-8">
         <main className="space-y-8">
-          <DiscountsSection />
+          {/* Filter Section */}
+          <DiscountFilterSection
+            data={locationFilteredData || []}
+            onFiltersChange={setFilters}
+            isCollapsed={isFiltersCollapsed}
+            onToggleCollapse={() => setIsFiltersCollapsed(!isFiltersCollapsed)}
+          />
+
+          {/* Location Selector */}
+          <DiscountLocationSelector
+            data={data || []}
+            selectedLocation={selectedLocation}
+            onLocationChange={setSelectedLocation}
+          />
+
+          {/* Animated Metric Cards */}
+          <DiscountMetricCards
+            data={locationFilteredData || []}
+            filters={filters}
+          />
+
+          {/* Interactive Charts */}
+          <DiscountInteractiveCharts
+            data={locationFilteredData || []}
+            filters={filters}
+          />
+
+          {/* Interactive Top/Bottom Lists */}
+          <DiscountInteractiveTopBottomLists
+            data={locationFilteredData || []}
+            filters={filters}
+          />
+
+          {/* Full Width Data Tables */}
+          <DiscountDataTable
+            data={locationFilteredData || []}
+            filters={filters}
+          />
         </main>
       </div>
       
