@@ -14,28 +14,97 @@ import { DiscountMetricCards } from '@/components/dashboard/DiscountMetricCards'
 import { DiscountInteractiveCharts } from '@/components/dashboard/DiscountInteractiveCharts';
 import { DiscountInteractiveTopBottomLists } from '@/components/dashboard/DiscountInteractiveTopBottomLists';
 import { DiscountDataTable } from '@/components/dashboard/DiscountDataTable';
+import { DrillDownModal } from '@/components/dashboard/DrillDownModal';
 
 const DiscountsPromotions = () => {
   const { data, loading } = useDiscountsData();
   const { isLoading: globalLoading, setLoading } = useGlobalLoading();
   const navigate = useNavigate();
-  const [isFiltersCollapsed, setIsFiltersCollapsed] = useState(false);
+  const [isFiltersCollapsed, setIsFiltersCollapsed] = useState(true); // Collapsed by default
   const [filters, setFilters] = useState<any>({});
   const [selectedLocation, setSelectedLocation] = useState<string>('all');
+  const [drillDownModal, setDrillDownModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    data: any[];
+    type: string;
+    columns: any[];
+  }>({
+    isOpen: false,
+    title: '',
+    data: [],
+    type: '',
+    columns: []
+  });
 
   useEffect(() => {
     setLoading(loading, 'Loading discount and promotional data...');
   }, [loading, setLoading]);
 
-  // Apply location filter
-  const locationFilteredData = useMemo(() => {
-    if (!data || selectedLocation === 'all') return data;
-    return data.filter(item => item.calculatedLocation === selectedLocation);
-  }, [data, selectedLocation]);
+  // Apply global filters
+  const filteredData = useMemo(() => {
+    if (!data) return [];
+    
+    let result = data.filter(item => (item.discountAmount || 0) > 0);
+    
+    // Apply location filter
+    if (selectedLocation !== 'all') {
+      result = result.filter(item => item.calculatedLocation === selectedLocation);
+    }
+    
+    // Apply other filters
+    if (filters.location && filters.location !== 'all') {
+      result = result.filter(item => item.calculatedLocation === filters.location);
+    }
+    
+    if (filters.category && filters.category !== 'all') {
+      result = result.filter(item => item.cleanedCategory === filters.category);
+    }
+    
+    if (filters.product && filters.product !== 'all') {
+      result = result.filter(item => item.cleanedProduct === filters.product);
+    }
+    
+    if (filters.soldBy && filters.soldBy !== 'all') {
+      const soldByValue = filters.soldBy === 'Online/System' ? '-' : filters.soldBy;
+      result = result.filter(item => item.soldBy === soldByValue);
+    }
+    
+    if (filters.paymentMethod && filters.paymentMethod !== 'all') {
+      result = result.filter(item => item.paymentMethod === filters.paymentMethod);
+    }
+    
+    if (filters.minDiscountAmount) {
+      result = result.filter(item => (item.discountAmount || 0) >= filters.minDiscountAmount);
+    }
+    
+    if (filters.maxDiscountAmount) {
+      result = result.filter(item => (item.discountAmount || 0) <= filters.maxDiscountAmount);
+    }
+    
+    if (filters.minDiscountPercent) {
+      result = result.filter(item => (item.discountPercentage || 0) >= filters.minDiscountPercent);
+    }
+    
+    if (filters.maxDiscountPercent) {
+      result = result.filter(item => (item.discountPercentage || 0) <= filters.maxDiscountPercent);
+    }
+    
+    if (filters.dateRange?.from || filters.dateRange?.to) {
+      result = result.filter(item => {
+        const itemDate = new Date(item.paymentDate);
+        if (filters.dateRange.from && itemDate < filters.dateRange.from) return false;
+        if (filters.dateRange.to && itemDate > filters.dateRange.to) return false;
+        return true;
+      });
+    }
+    
+    return result;
+  }, [data, filters, selectedLocation]);
 
-  // Calculate key metrics for hero section
+  // Calculate hero metrics from filtered data
   const heroMetrics = useMemo(() => {
-    if (!locationFilteredData || locationFilteredData.length === 0) {
+    if (!filteredData || filteredData.length === 0) {
       return {
         totalDiscountValue: 0,
         discountedTransactions: 0,
@@ -46,15 +115,13 @@ const DiscountsPromotions = () => {
       };
     }
 
-    const discountedData = locationFilteredData.filter(item => (item.discountAmount || 0) > 0);
-    
-    const totalDiscountValue = discountedData.reduce((sum, item) => sum + (item.discountAmount || 0), 0);
-    const discountedTransactions = discountedData.length;
-    const uniqueMembers = new Set(discountedData.map(item => item.customerEmail)).size;
-    const unitsSold = discountedData.length;
-    const totalDiscountPercentages = discountedData.reduce((sum, item) => sum + (item.discountPercentage || 0), 0);
+    const totalDiscountValue = filteredData.reduce((sum, item) => sum + (item.discountAmount || 0), 0);
+    const discountedTransactions = filteredData.length;
+    const uniqueMembers = new Set(filteredData.map(item => item.customerEmail)).size;
+    const unitsSold = filteredData.length;
+    const totalDiscountPercentages = filteredData.reduce((sum, item) => sum + (item.discountPercentage || 0), 0);
     const avgDiscountPercentage = discountedTransactions > 0 ? totalDiscountPercentages / discountedTransactions : 0;
-    const totalRevenueLost = discountedData.reduce((sum, item) => sum + ((item.mrpPostTax || item.mrpPreTax || item.paymentValue || 0) - (item.paymentValue || 0)), 0);
+    const totalRevenueLost = filteredData.reduce((sum, item) => sum + ((item.mrpPostTax || item.mrpPreTax || item.paymentValue || 0) - (item.paymentValue || 0)), 0);
 
     return {
       totalDiscountValue,
@@ -64,7 +131,25 @@ const DiscountsPromotions = () => {
       unitsSold,
       totalRevenueLost
     };
-  }, [locationFilteredData]);
+  }, [filteredData]);
+
+  const handleDrillDown = (title: string, data: any[], type: string) => {
+    const columns = [
+      { key: 'customerName', header: 'Customer' },
+      { key: 'paymentItem', header: 'Product' },
+      { key: 'paymentDate', header: 'Date' },
+      { key: 'discountAmount', header: 'Discount', render: (value: number) => formatCurrency(value) },
+      { key: 'paymentValue', header: 'Revenue', render: (value: number) => formatCurrency(value) }
+    ];
+    
+    setDrillDownModal({
+      isOpen: true,
+      title,
+      data,
+      type,
+      columns
+    });
+  };
 
   if (globalLoading) {
     return <RefinedLoader subtitle="Loading discount and promotional data..." />;
@@ -171,7 +256,7 @@ const DiscountsPromotions = () => {
         <main className="space-y-8">
           {/* Filter Section */}
           <DiscountFilterSection
-            data={locationFilteredData || []}
+            data={data || []}
             onFiltersChange={setFilters}
             isCollapsed={isFiltersCollapsed}
             onToggleCollapse={() => setIsFiltersCollapsed(!isFiltersCollapsed)}
@@ -186,29 +271,42 @@ const DiscountsPromotions = () => {
 
           {/* Animated Metric Cards */}
           <DiscountMetricCards
-            data={locationFilteredData || []}
+            data={filteredData}
             filters={filters}
+            onDrillDown={handleDrillDown}
           />
 
           {/* Interactive Charts */}
           <DiscountInteractiveCharts
-            data={locationFilteredData || []}
+            data={filteredData}
             filters={filters}
           />
 
           {/* Interactive Top/Bottom Lists */}
           <DiscountInteractiveTopBottomLists
-            data={locationFilteredData || []}
+            data={filteredData}
             filters={filters}
+            onDrillDown={handleDrillDown}
           />
 
           {/* Full Width Data Tables */}
           <DiscountDataTable
-            data={locationFilteredData || []}
+            data={filteredData}
             filters={filters}
+            onRowClick={handleDrillDown}
           />
         </main>
       </div>
+      
+      {/* Drill Down Modal */}
+      <DrillDownModal
+        isOpen={drillDownModal.isOpen}
+        onClose={() => setDrillDownModal({ ...drillDownModal, isOpen: false })}
+        title={drillDownModal.title}
+        data={drillDownModal.data}
+        type={drillDownModal.type}
+        columns={drillDownModal.columns}
+      />
       
       <Footer />
 
