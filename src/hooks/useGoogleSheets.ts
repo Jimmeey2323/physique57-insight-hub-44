@@ -5,10 +5,9 @@ import { SalesData } from '@/types/dashboard';
 const GOOGLE_CONFIG = {
   CLIENT_ID: "416630995185-007ermh3iidknbbtdmu5vct207mdlbaa.apps.googleusercontent.com",
   CLIENT_SECRET: "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",
-  REFRESH_TOKEN: "1//04w4V2xMUIMzACgYIARAAGAQSNwF-L9Ir5__pXDmZVYaHKOSqyauTDVmTvrCvgaL2beep4gmp8_lVED0ppM9BPWDDimHyQKk50EY",
+  REFRESH_TOKEN: "1//04pAfj5ZB3ahLCgYIARAAGAQSNwF-L9IrqCo4OyUjAbO1hP5bR3vhs8K96zDZkbeCzcuCjzEiBPZ3O639cLRkUduicMYK1Rzs5GY",
   TOKEN_URL: "https://oauth2.googleapis.com/token"
 };
-
 const SPREADSHEET_ID = "12xbYJQrh5wyYDaFhQrq4L0-YkSSlA6z7nMCb66XEbCQ";
 
 export const useGoogleSheets = () => {
